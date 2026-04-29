@@ -173,16 +173,9 @@ pinch threshold: dist < 0.05     // normalized distance for pinch
 
 ---
 
-## 📄 License
-
-This project is created for personal/portfolio use.  
-MediaPipe is licensed under the [Apache 2.0 License](https://github.com/google/mediapipe/blob/master/LICENSE).
-
----
-
 <div align="center">
 
-**Made with 🌌 by Vaani Sharma**
+**Made by Vaani Sharma**
 
 *Point your hands at the camera. The universe responds.*
 
