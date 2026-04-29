@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaani Sharma · Space AR</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --accent: #b47fff;
+            --accent2: #00ffcc;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Georgia', serif;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* ── ENTRANCE SCREEN ── */
+        #entrance {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            transition: opacity 1s ease;
+        }
+        #entrance.hide { opacity: 0; pointer-events: none; }
+
+        canvas#starsBg {
+            position: fixed;
+            inset: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }
+
+        .nebula {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 1;
+        }
+        .nebula-1 {
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(120,0,200,0.18) 0%, transparent 70%);
+            top: -100px; left: -100px;
+            animation: nebulaDrift 18s ease-in-out infinite alternate;
+        }
+        .nebula-2 {
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(0,80,200,0.15) 0%, transparent 70%);
+            bottom: -80px; right: -80px;
+            animation: nebulaDrift 22s ease-in-out infinite alternate-reverse;
+        }
+        .nebula-3 {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(200,0,100,0.1) 0%, transparent 70%);
+            top: 40%; left: 60%;
+            animation: nebulaDrift 16s ease-in-out infinite alternate;
+        }
+        @keyframes nebulaDrift {
+            from { transform: translate(0,0) scale(1); }
+            to   { transform: translate(40px,30px) scale(1.08); }
+        }
+
+        .center {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .orbit-wrap {
+            position: relative;
+            width: 220px; height: 220px;
+            margin-bottom: 36px;
+        }
+        .orbit-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(180,130,255,0.25);
+            animation: spinRing 12s linear infinite;
+        }
+        .orbit-ring-2 { inset:14px; border-color:rgba(100,180,255,0.2); animation: spinRing 20s linear infinite reverse; }
+        .orbit-ring-3 { inset:28px; border-color:rgba(255,120,200,0.15); animation: spinRing 8s linear infinite; }
+        @keyframes spinRing { to { transform: rotate(360deg); } }
+
+        .orbit-dot {
+            position: absolute;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            top: -3.5px;
+            left: calc(50% - 3.5px);
+            transform-origin: 50% 113px;
+        }
+        .orbit-dot-1 { background:#b47fff; box-shadow:0 0 8px 3px rgba(180,127,255,0.8); animation:spinRing 12s linear infinite; }
+        .orbit-dot-2 { width:5px;height:5px;top:-2.5px;left:calc(50% - 2.5px);background:#64b4ff;box-shadow:0 0 8px 3px rgba(100,180,255,0.8);transform-origin:50% 106px;animation:spinRing 20s linear infinite reverse; }
+        .orbit-dot-3 { width:5px;height:5px;top:-2.5px;left:calc(50% - 2.5px);background:#ff78c8;box-shadow:0 0 8px 3px rgba(255,120,200,0.8);transform-origin:50% 99px;animation:spinRing 8s linear infinite; }
+
+        .avatar {
+            position: absolute;
+            top:50%; left:50%;
+            transform: translate(-50%,-50%);
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 38% 38%, #4a2080 0%, #1a0840 40%, #090418 100%);
+            box-shadow: 0 0 0 2px rgba(180,127,255,0.3), 0 0 30px 8px rgba(120,40,200,0.4), 0 0 60px 20px rgba(60,0,120,0.2), inset 0 0 30px rgba(0,0,0,0.6);
+            overflow: hidden;
+        }
+        .avatar::before {
+            content:'';
+            position:absolute;
+            top:12%;left:15%;
+            width:28%;height:22%;
+            background:rgba(255,255,255,0.07);
+            border-radius:50%;
+            filter:blur(4px);
+        }
+        .avatar-initials {
+            position:absolute;
+            inset:0;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:2.2rem;
+            font-weight:300;
+            color:rgba(220,200,255,0.9);
+            letter-spacing:0.05em;
+            text-shadow:0 0 20px rgba(180,127,255,0.8);
+        }
+
+        .name {
+            font-size: 2.6rem;
+            font-weight: 400;
+            letter-spacing: 0.22em;
+            color: #fff;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            text-shadow: 0 0 20px rgba(180,127,255,0.7), 0 0 60px rgba(120,60,200,0.3);
+            opacity: 0;
+            animation: riseFade 1.2s ease 0.4s forwards;
+        }
+        .tagline {
+            font-size: 0.78rem;
+            letter-spacing: 0.35em;
+            color: rgba(180,150,255,0.7);
+            text-transform: uppercase;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: riseFade 1.2s ease 0.8s forwards;
+        }
+        @keyframes riseFade {
+            from { opacity:0; transform:translateY(16px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .divider {
+            width:200px; height:1px;
+            position:relative;
+            margin-bottom:40px;
+            opacity:0;
+            animation:riseFade 1s ease 1.1s forwards;
+        }
+        .divider::before {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:linear-gradient(90deg,transparent,rgba(180,127,255,0.8),transparent);
+        }
+        .divider-dot {
+            position:absolute;
+            top:50%;left:50%;
+            transform:translate(-50%,-50%);
+            width:5px;height:5px;
+            border-radius:50%;
+            background:#b47fff;
+            box-shadow:0 0 8px 3px rgba(180,127,255,0.9);
+        }
+        .enter-btn {
+            background:transparent;
+            border:1px solid rgba(180,127,255,0.4);
+            color:rgba(220,200,255,0.9);
+            font-family:inherit;
+            font-size:0.72rem;
+            letter-spacing:0.3em;
+            text-transform:uppercase;
+            padding:13px 44px;
+            border-radius:40px;
+            cursor:pointer;
+            position:relative;
+            overflow:hidden;
+            transition:border-color 0.4s,box-shadow 0.4s,color 0.4s;
+            opacity:0;
+            animation:riseFade 1s ease 1.4s forwards;
+        }
+        .enter-btn:hover {
+            border-color:rgba(180,127,255,0.9);
+            color:#fff;
+            box-shadow:0 0 24px rgba(180,127,255,0.3),inset 0 0 20px rgba(180,127,255,0.06);
+        }
+        .enter-btn::after {
+            content:'';
+            position:absolute;
+            top:0;left:-100%;
+            width:100%;height:100%;
+            background:linear-gradient(90deg,transparent,rgba(180,127,255,0.12),transparent);
+            animation:shimmer 3.5s linear infinite;
+        }
+        @keyframes shimmer { to { left:200%; } }
+
+        .shoot {
+            position:fixed;
+            height:1px;
+            background:linear-gradient(90deg,transparent,rgba(255,255,255,0.9));
+            border-radius:1px;
+            pointer-events:none;
+            z-index:2;
+            opacity:0;
+        }
+
+        .hud-corner {
+            position:fixed;
+            width:22px;height:22px;
+            border-color:rgba(180,127,255,0.3);
+            border-style:solid;
+            z-index:5;
+            opacity:0;
+            animation:riseFade 1s ease 1.8s forwards;
+        }
+        .hud-corner.tl { top:20px;left:20px;border-width:1px 0 0 1px; }
+        .hud-corner.tr { top:20px;right:20px;border-width:1px 1px 0 0; }
+        .hud-corner.bl { bottom:20px;left:20px;border-width:0 0 1px 1px; }
+        .hud-corner.br { bottom:20px;right:20px;border-width:0 1px 1px 0; }
+        .hud-label {
+            position:fixed;
+            font-size:0.55rem;
+            letter-spacing:0.2em;
+            color:rgba(180,127,255,0.35);
+            text-transform:uppercase;
+            z-index:5;
+            opacity:0;
+            animation:riseFade 1s ease 2s forwards;
+        }
+        .hud-label.tl { top:28px;left:50px; }
+        .hud-label.br { bottom:28px;right:50px; }
+
+        /* ── AR SCREEN ── */
+        #arScreen {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: none;
+        }
+
+        .input_video {
+            position: absolute;
+            inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            z-index: 0;
+            filter: brightness(0.55) contrast(1.1);
+        }
+
+        #bgCanvas, #mainCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        #bgCanvas  { z-index: 1; pointer-events: none; }
+        #mainCanvas{ z-index: 5; pointer-events: none; }
+
+        /* Name watermark in AR mode */
+        #arName {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            font-family: 'Georgia', serif;
+            font-size: 1.4rem;
+            font-weight: 300;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: rgba(220,200,255,0.85);
+            text-shadow: 0 0 20px rgba(180,127,255,0.7);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        #hud {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: none;
+        }
+        .panel {
+            background: rgba(10,5,25,0.5);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(180,127,255,0.2);
+            border-radius: 12px;
+            padding: 12px 18px;
+        }
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.82rem;
+            color: rgba(255,255,255,0.7);
+            min-width: 175px;
+            font-family: -apple-system, sans-serif;
+        }
+        .stat:last-child { margin-bottom: 0; }
+        .stat span.val { font-weight: bold; color: var(--accent); }
+
+        #themes {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+            background: rgba(10,5,25,0.5);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(180,127,255,0.2);
+            border-radius: 30px;
+            padding: 7px;
+        }
+        .theme-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: white;
+            padding: 7px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: 500;
+            font-size: 0.82rem;
+            font-family: -apple-system, sans-serif;
+        }
+        .theme-btn.active {
+            background: rgba(180,127,255,0.15);
+            border-color: rgba(180,127,255,0.4);
+            text-shadow: 0 0 10px rgba(180,127,255,0.8);
+        }
+
+        /* Back button */
+        #backBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 20;
+            background: rgba(10,5,25,0.5);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(180,127,255,0.3);
+            color: rgba(220,200,255,0.8);
+            font-family: -apple-system, sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            padding: 8px 18px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: border-color 0.3s, color 0.3s;
+        }
+        #backBtn:hover { border-color: rgba(180,127,255,0.8); color: #fff; }
+
+        .hidden { opacity:0!important; pointer-events:none!important; }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     ENTRANCE SCREEN
+═══════════════════════════════════════ -->
+<div id="entrance">
+    <canvas id="starsBg"></canvas>
+    <div class="nebula nebula-1"></div>
+    <div class="nebula nebula-2"></div>
+    <div class="nebula nebula-3"></div>
+
+    <div class="hud-corner tl"></div>
+    <div class="hud-corner tr"></div>
+    <div class="hud-corner bl"></div>
+    <div class="hud-corner br"></div>
+    <div class="hud-label tl">Vaani Sharma · Space AR</div>
+    <div class="hud-label br">Hand Tracking Active</div>
+
+    <div class="center" id="centerContent">
+        <div class="orbit-wrap">
+            <div class="orbit-ring orbit-ring-2"></div>
+            <div class="orbit-ring orbit-ring-3"></div>
+            <div class="orbit-ring"></div>
+            <div class="orbit-dot orbit-dot-1"></div>
+            <div class="orbit-dot orbit-dot-2"></div>
+            <div class="orbit-dot orbit-dot-3"></div>
+            <div class="avatar">
+                <div class="avatar-initials">VS</div>
+            </div>
+        </div>
+        <div class="name">Vaani Sharma</div>
+        <div class="tagline">Advanced Hand Tracking AR · Space Edition</div>
+        <div class="divider"><div class="divider-dot"></div></div>
+        <button class="enter-btn" id="enterBtn">Enter Space AR</button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     AR SCREEN
+═══════════════════════════════════════ -->
+<div id="arScreen">
+    <video class="input_video" autoplay playsinline></video>
+    <canvas id="bgCanvas"></canvas>
+    <canvas id="mainCanvas"></canvas>
+
+    <div id="arName">Vaani Sharma</div>
+
+    <div id="hud">
+        <div class="panel">
+            <div class="stat">Hands: <span class="val" id="ui-hands">0</span></div>
+            <div class="stat">FPS: <span class="val" id="ui-fps">0</span></div>
+        </div>
+        <div class="panel">
+            <div class="stat">Gesture: <span class="val" id="ui-gesture">None</span></div>
+            <div class="stat">Spread: <span class="val" id="ui-spread">0%</span></div>
+        </div>
+    </div>
+
+    <div id="themes">
+        <button class="theme-btn active" data-theme="Galaxy">Galaxy</button>
+        <button class="theme-btn" data-theme="Rainbow">Rainbow</button>
+        <button class="theme-btn" data-theme="Cyberpunk">Cyberpunk</button>
+        <button class="theme-btn" data-theme="Lava">Lava</button>
+        <button class="theme-btn" data-theme="Ocean">Ocean</button>
+    </div>
+
+    <button id="backBtn" onclick="goBack()">✕ Exit</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   ENTRANCE STAR FIELD
+═══════════════════════════════════════ */
+const starCanvas = document.getElementById('starsBg');
+const sCtx = starCanvas.getContext('2d');
+let sW, sH, stars = [];
+
+function resizeStars() {
+    sW = starCanvas.width = window.innerWidth;
+    sH = starCanvas.height = window.innerHeight;
+    buildStars();
+}
+function buildStars() {
+    stars = [];
+    const count = Math.floor((sW * sH) / 1800);
+    for (let i = 0; i < count; i++) {
+        stars.push({
+            x: Math.random() * sW, y: Math.random() * sH,
+            r: Math.random() * 1.3,
+            alpha: Math.random(),
+            speed: 0.003 + Math.random() * 0.008,
+            phase: Math.random() * Math.PI * 2
+        });
+    }
+}
+function drawStars(t) {
+    sCtx.clearRect(0, 0, sW, sH);
+    for (const s of stars) {
+        const a = s.alpha * (0.4 + 0.6 * Math.sin(t * s.speed + s.phase));
+        sCtx.beginPath();
+        sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        sCtx.fillStyle = `rgba(255,255,255,${a})`;
+        sCtx.fill();
+    }
+}
+
+function shootingStar() {
+    const el = document.createElement('div');
+    el.classList.add('shoot');
+    const startX = Math.random() * sW;
+    const startY = Math.random() * sH * 0.6;
+    const length = 80 + Math.random() * 120;
+    const angle = 20 + Math.random() * 20;
+    el.style.cssText = `left:${startX}px;top:${startY}px;width:${length}px;transform:rotate(${angle}deg);`;
+    document.body.appendChild(el);
+    let op = 0, dir = 1;
+    const iv = setInterval(() => {
+        op += dir * 0.08;
+        if (op >= 1) dir = -1;
+        if (op <= 0) { clearInterval(iv); el.remove(); return; }
+        el.style.opacity = op;
+    }, 16);
+    setTimeout(() => { clearInterval(iv); el.remove(); }, 900);
+}
+setInterval(shootingStar, 3200);
+
+let st = 0;
+function starLoop() {
+    st++;
+    drawStars(st);
+    requestAnimationFrame(starLoop);
+}
+resizeStars();
+starLoop();
+window.addEventListener('resize', resizeStars);
+
+/* ═══════════════════════════════════════
+   AR ENGINE GLOBALS
+═══════════════════════════════════════ */
+const videoElement = document.querySelector('.input_video');
+const bgCanvas  = document.getElementById('bgCanvas');
+const mainCanvas= document.getElementById('mainCanvas');
+const bgCtx  = bgCanvas.getContext('2d');
+const ctx    = mainCanvas.getContext('2d');
+
+let width = window.innerWidth, height = window.innerHeight;
+let time = 0, lastTime = performance.now();
+let framesThisSecond = 0, lastFpsTime = performance.now();
+let currentHands = [], handVelocities = 0;
+
+let currentTheme = 'Galaxy';
+const themes = {
+    'Galaxy':    (t, i, n) => `hsl(${260 + Math.sin(t*2+i)*50}, 100%, 65%)`,
+    'Rainbow':   (t, i, n) => `hsl(${(t*100 + i*(360/Math.max(n,1))) % 360}, 100%, 60%)`,
+    'Cyberpunk': (t, i, n) => (i % 2 === 0) ? '#ff003c' : '#00f0ff',
+    'Lava':      (t, i, n) => `hsl(${(10 + i*10) % 40}, 100%, ${50+Math.sin(t)*10}%)`,
+    'Ocean':     (t, i, n) => `hsl(${180 + i*20}, 100%, 60%)`
+};
+
+let particles = [], ripples = [];
+const FINGER_TIPS = [4, 8, 12, 16, 20];
+let matrixColumns = [];
+const fontSize = 16;
+let maxColumns = 0;
+
+let audioCtx = null, humOsc = null, humGain = null;
+
+const uiHands   = document.getElementById('ui-hands');
+const uiFps     = document.getElementById('ui-fps');
+const uiGesture = document.getElementById('ui-gesture');
+const uiSpread  = document.getElementById('ui-spread');
+
+/* ═══════════════════════════════════════
+   ENTER / EXIT
+═══════════════════════════════════════ */
+document.getElementById('enterBtn').addEventListener('click', () => {
+    const entrance = document.getElementById('entrance');
+    entrance.classList.add('hide');
+    setTimeout(() => {
+        entrance.style.display = 'none';
+        document.getElementById('arScreen').style.display = 'block';
+        resizeAR();
+        initAudio();
+        initMediaPipe();
+        requestAnimationFrame(renderLoop);
+    }, 1000);
+});
+
+function goBack() {
+    document.getElementById('arScreen').style.display = 'none';
+    const entrance = document.getElementById('entrance');
+    entrance.style.display = 'flex';
+    entrance.classList.remove('hide');
+    if (humGain) humGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+}
+
+/* ═══════════════════════════════════════
+   RESIZE
+═══════════════════════════════════════ */
+function resizeAR() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    bgCanvas.width   = width;  bgCanvas.height  = height;
+    mainCanvas.width = width;  mainCanvas.height = height;
+    maxColumns = Math.floor(width / fontSize);
+    matrixColumns = new Array(maxColumns).fill(1).map(() => Math.random() * height / fontSize);
+}
+window.addEventListener('resize', () => {
+    resizeStars();
+    if (document.getElementById('arScreen').style.display === 'block') resizeAR();
+});
+
+/* ═══════════════════════════════════════
+   THEME SWITCHER
+═══════════════════════════════════════ */
+document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        currentTheme = e.target.getAttribute('data-theme');
+    });
+});
+
+/* ═══════════════════════════════════════
+   AUDIO ENGINE
+═══════════════════════════════════════ */
+function initAudio() {
+    try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        humOsc  = audioCtx.createOscillator();
+        humGain = audioCtx.createGain();
+        humOsc.type = 'sine';
+        humOsc.frequency.value = 100;
+        humGain.gain.value = 0;
+        humOsc.connect(humGain);
+        humGain.connect(audioCtx.destination);
+        humOsc.start();
+    } catch(e) { console.warn('Audio unavailable', e); }
+}
+
+function triggerZap() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const g   = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+    g.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+    osc.connect(g); g.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function updateHum(activeHands) {
+    if (!audioCtx || !humGain) return;
+    if (activeHands.length < 2) {
+        humGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        return;
+    }
+    const p1 = activeHands[0][8], p2 = activeHands[1][8];
+    const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    humOsc.frequency.setTargetAtTime(100 + (1 - Math.min(dist,1)) * 300, audioCtx.currentTime, 0.1);
+    humGain.gain.setTargetAtTime(0.05 + (1 - Math.min(dist,1)) * 0.12, audioCtx.currentTime, 0.1);
+}
+
+/* ═══════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════ */
+function getDist(p1, p2) { return Math.hypot(p1.x - p2.x, p1.y - p2.y); }
+function mapToCanvas(pt) { return { x: pt.x * width, y: pt.y * height }; }
+
+let lastPinchState = [false, false];
+
+function detectGestures() {
+    if (!currentHands.length) return;
+    currentHands.forEach((hand, idx) => {
+        const thumb = hand[4], index = hand[8];
+        const dist  = getDist(thumb, index);
+        const isPinching = dist < 0.05;
+        if (isPinching && !lastPinchState[idx]) {
+            const mid = { x:(thumb.x+index.x)/2, y:(thumb.y+index.y)/2 };
+            createShockwave(mapToCanvas(mid), themes[currentTheme](time, 1, 1));
+            triggerZap();
+            uiGesture.innerText = 'PINCH!';
+        }
+        lastPinchState[idx] = isPinching;
+    });
+    if (currentHands[0]) {
+        const spread = getDist(currentHands[0][8], currentHands[0][20]);
+        const pct = Math.min(Math.round(spread * 300), 100);
+        uiSpread.innerText = pct + '%';
+        if (!lastPinchState.includes(true))
+            uiGesture.innerText = pct > 50 ? 'Open Hand' : 'Fist';
+    }
+}
+
+/* ═══════════════════════════════════════
+   EFFECTS
+═══════════════════════════════════════ */
+function createParticles(pos, color, count = 2) {
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: pos.x, y: pos.y,
+            vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8,
+            life: 1.0, color, size: Math.random()*3+1
+        });
+    }
+}
+function createShockwave(pos, color) {
+    ripples.push({
+        x: pos.x, y: pos.y,
+        radius: 0, maxRadius: 150+Math.random()*100,
+        life: 1.0, color
+    });
+}
+
+/* Space-flavoured background: star-field rain instead of matrix */
+function drawBackground() {
+    bgCtx.globalCompositeOperation = 'destination-out';
+    bgCtx.fillStyle = `rgba(0,0,0,${0.12 + Math.min(handVelocities*10, 0.45)})`;
+    bgCtx.fillRect(0, 0, width, height);
+    bgCtx.globalCompositeOperation = 'source-over';
+
+    /* Sparse glowing particles drifting down */
+    const col = themes[currentTheme](time, 1, 1);
+    bgCtx.fillStyle = col;
+    bgCtx.font = fontSize + 'px monospace';
+    const speed = 1 + handVelocities * 80;
+    for (let i = 0; i < matrixColumns.length; i++) {
+        if (Math.random() > 0.96) {
+            /* mix katakana + star glyphs */
+            const glyphs = ['✦','✧','⋆','·','★','✵'];
+            const ch = Math.random() > 0.5
+                ? String.fromCharCode(0x30A0 + Math.random()*96)
+                : glyphs[Math.floor(Math.random()*glyphs.length)];
+            bgCtx.globalAlpha = 0.5 + Math.random() * 0.5;
+            bgCtx.fillText(ch, i * fontSize, matrixColumns[i] * fontSize);
+            bgCtx.globalAlpha = 1;
+        }
+        matrixColumns[i] += Math.random() * speed;
+        if (matrixColumns[i] * fontSize > height && Math.random() > 0.9)
+            matrixColumns[i] = 0;
+    }
+}
+
+function updatePhysics() {
+    /* Particles */
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.life -= 0.02; p.vy += 0.08;
+        if (p.life <= 0) { particles.splice(i, 1); continue; }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.fill();
+    }
+    /* Ripples */
+    for (let i = ripples.length - 1; i >= 0; i--) {
+        const r = ripples[i];
+        r.radius += (r.maxRadius - r.radius) * 0.1;
+        r.life -= 0.025;
+        if (r.life <= 0) { ripples.splice(i, 1); continue; }
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = r.color;
+        ctx.lineWidth = 4 * r.life;
+        ctx.globalAlpha = r.life;
+        ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+}
+
+/* ═══════════════════════════════════════
+   RENDER LOOP
+═══════════════════════════════════════ */
+function renderLoop(timestamp) {
+    requestAnimationFrame(renderLoop);
+
+    const dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+    time += dt;
+
+    framesThisSecond++;
+    if (timestamp > lastFpsTime + 1000) {
+        uiFps.innerText = framesThisSecond;
+        framesThisSecond = 0;
+        lastFpsTime = timestamp;
+    }
+
+    drawBackground();
+
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalCompositeOperation = 'screen';
+
+    updatePhysics();
+
+    if (currentHands.length > 0) {
+
+        currentHands.forEach((hand, handIndex) => {
+            const glowColor = themes[currentTheme](time, handIndex, 2);
+
+            drawConnectors(ctx, hand, HAND_CONNECTIONS, { color: glowColor, lineWidth: 2 });
+
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = glowColor;
+
+            FINGER_TIPS.forEach((tipIdx, i) => {
+                const pt  = mapToCanvas(hand[tipIdx]);
+                const col = themes[currentTheme](time, i, FINGER_TIPS.length);
+
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+
+                if (Math.random() > 0.55) createParticles(pt, col, 1);
+            });
+            ctx.shadowBlur = 0;
+        });
+
+        /* Two-hand interactions */
+        if (currentHands.length >= 2) {
+            const h1 = currentHands[0], h2 = currentHands[1];
+
+            FINGER_TIPS.forEach((tipIdx, idx) => {
+                const pt1 = mapToCanvas(h1[tipIdx]);
+                const pt2 = mapToCanvas(h2[tipIdx]);
+                const dist = getDist(pt1, pt2);
+                const col  = themes[currentTheme](time, idx, FINGER_TIPS.length);
+
+                /* Lightning arc */
+                if (dist < 150 && Math.random() > 0.5) {
+                    ctx.beginPath();
+                    ctx.moveTo(pt1.x, pt1.y);
+                    const mx = (pt1.x+pt2.x)/2 + (Math.random()-0.5)*50;
+                    const my = (pt1.y+pt2.y)/2 + (Math.random()-0.5)*50;
+                    ctx.lineTo(mx, my);
+                    ctx.lineTo(pt2.x, pt2.y);
+                    ctx.strokeStyle = '#fff';
+                    ctx.shadowBlur = 22;
+                    ctx.shadowColor = col;
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                }
+
+                /* Gradient beam */
+                ctx.beginPath();
+                ctx.moveTo(pt1.x, pt1.y);
+                ctx.lineTo(pt2.x, pt2.y);
+                const grad = ctx.createLinearGradient(pt1.x, pt1.y, pt2.x, pt2.y);
+                grad.addColorStop(0,   themes[currentTheme](time, idx,   5));
+                grad.addColorStop(0.5, themes[currentTheme](time, idx+1, 5));
+                grad.addColorStop(1,   themes[currentTheme](time, idx+2, 5));
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = 4;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = col;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+
+            /* Mandala / star connector */
+            const allTips = FINGER_TIPS.map(t => mapToCanvas(h1[t]))
+                           .concat(FINGER_TIPS.map(t => mapToCanvas(h2[t])));
+            const cx = allTips.reduce((s,p)=>s+p.x,0)/10;
+            const cy = allTips.reduce((s,p)=>s+p.y,0)/10;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(time * 0.4);
+            ctx.beginPath();
+            for (let i = 0; i < 10; i++) {
+                const t1 = { x:allTips[i].x-cx,       y:allTips[i].y-cy };
+                const t2 = { x:allTips[(i+3)%10].x-cx, y:allTips[(i+3)%10].y-cy };
+                ctx.moveTo(t1.x, t1.y);
+                ctx.lineTo(t2.x, t2.y);
+            }
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        detectGestures();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+}
+
+/* ═══════════════════════════════════════
+   MEDIAPIPE
+═══════════════════════════════════════ */
+function initMediaPipe() {
+    const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+    hands.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.7, minTrackingConfidence:0.7 });
+    hands.onResults(results => {
+        if (!audioCtx) return;
+        uiHands.innerText = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+
+        if (currentHands.length > 0 && results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            const oldP = currentHands[0][8], newP = results.multiHandLandmarks[0][8];
+            if (oldP && newP) handVelocities = getDist(oldP, newP);
+        } else { handVelocities = 0; }
+
+        currentHands = results.multiHandLandmarks || [];
+        updateHum(currentHands);
+    });
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({ image: videoElement }); },
+        width: 1280, height: 720, facingMode: 'user'
+    });
+    camera.start();
+}
+</script>
+</body>
+</html>
